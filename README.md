@@ -1,4 +1,4 @@
-# TestContainer Demo
+# TestContainer
 
 This is a sample project that demonstrates the use of a TestContainer that provides easy and lightweight APIs for bootstrapping integration tests with real services wrapped in Docker containers. 
 
@@ -249,3 +249,67 @@ Passed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration:
 
 By running the customer service test, you can see in the output that Testcontainers pulled the Postgres Docker image from DockerHub if it’s not already available locally, started the container, and executed the test.
 
+## Add CI workflow
+
+Signup for a free TestContainer Cloud account. 
+
+Create a new service account and save the token in a GitHub secret called TC_CLOUD_TOKEN. 
+
+Create a github action as follows:
+
+```yml
+name: Build and Test
+on:
+  push:
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+    - 'README.md'
+    - '.gitignore'
+env:
+  DOTNET_VERSION: '8.0.x'
+jobs:
+  build-and-test:
+    name: ${{matrix.os}}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup Testcontainers Cloud Client
+      uses: atomicjar/testcontainers-cloud-setup-action@v1
+      with:
+        token: ${{ secrets.TC_CLOUD_TOKEN }}
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+    - name: Install dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+    # Add coverlet.collector nuget package to test project - 'dotnet add <TestProject.cspoj> package coverlet
+    - name: Test
+      run: dotnet test --no-restore --verbosity normal --collect:"XPlat Code Coverage" --logger trx --results-directory coverage
+    - name: Code Coverage Summary Report
+      uses: irongut/CodeCoverageSummary@v1.3.0
+      with:
+        filename: 'coverage/*/coverage.cobertura.xml'
+        badge: true
+        format: 'markdown'
+        output: 'both'
+    - name: Add Coverage PR Comment
+      uses: marocchino/sticky-pull-request-comment@v2
+      if: github.event_name == 'pull_request'
+      with:
+        recreate: true
+        path: code-coverage-results.md
+    - name: Write to Job Summary
+      run: cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
+    # (Optionally) When you don't need Testcontainers anymore, you could terminate sessions eagerly
+    - name: Terminate Testcontainers Cloud Client active sessions
+      uses: atomicjar/testcontainers-cloud-setup-action@v1
+      with:
+        action: terminate
+```
