@@ -15,7 +15,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macOS-latest]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+    - name: Setup Testcontainers Cloud Client
+      uses: atomicjar/testcontainers-cloud-setup-action@v1
+      with:
+        token: ${{ secrets.TC_CLOUD_TOKEN }}
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
       with:
